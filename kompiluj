@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# --- Sprawdzenie argumentu ---
+if [ $# -ne 1 ]; then
+    echo "Użycie: $0 sciezka/do/pliku.cpp"
+    exit 1
+fi
+
+plik="$1"
+
+if [ ! -f "$plik" ]; then
+    echo "Błąd: Plik nie istnieje!"
+    exit 1
+fi
+
+# --- Pobranie limitów od użytkownika ---
+sciezka_katalogu=$(dirname "$plik")
+nazwa_pliku=$(basename "$plik" .cpp)
+plik_wykonywalny="$sciezka_katalogu/$nazwa_pliku"
+
+g++ -O2 -std=c++17 -o "$plik_wykonywalny" "$plik"
+if [ $? -ne 0 ]; then
+    echo "❌ Błąd podczas kompilacji!"
+    exit 1
+fi
+
+echo "✅ Kompilacja zakończona sukcesem! Uruchamianie programu..."
+
+# --- Pliki tymczasowe ---
+output_file=$(mktemp)
+stats_file=$(mktemp)
+
+# --- Uruchomienie programu z pomiarem czasu i pamięci ---
+# Program będzie oczekiwał na wejście użytkownika w terminalu
+/usr/bin/time -v "$plik_wykonywalny" 2>"$stats_file" | tee "$output_file"
+
+# --- Wyciągnięcie wyników ---
+max_ram_kb=$(grep "Maximum resident set size" "$stats_file" | awk '{print $6}')
+user_time=$(grep "User time (seconds)" "$stats_file" | awk '{print $4}')
+real_time=$(grep "Elapsed (wall clock) time" "$stats_file" | awk '{print $8}')
+
+max_ram_mb=$(awk "BEGIN {printf \"%.2f\", $max_ram_kb/1024}")
+
+echo ""
+echo "Program zakończony."
+echo "Czas CPU: ${user_time} s"
+echo "Czas rzeczywisty: $real_time"
+echo "Maksymalny RAM: ${max_ram_mb} MB"
+echo "Limity: czas = ${limit_sec}s, RAM = ${ram_limit} MB"
+
